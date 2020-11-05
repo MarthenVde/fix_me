@@ -2,10 +2,7 @@ package com.wtc.marvand.market;
 
 import java.net.*;
 import java.io.*;
-/**
- * Hello world!
- *
- */
+
 public class Market {
     public static void main( String[] args )
     {

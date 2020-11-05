@@ -1,30 +1,25 @@
 package com.wtc.marvand.router;
 
-import java.io.IOException;
-import java.net.ServerSocket;
-public class Router extends Thread {
-    int portNumber = 5001;
-    ServerSocket serverSocket = null;
+import java.net.*;
+import java.io.*;
+import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.*;
+import java.util.*;
+public class Router {
+    public static void main(String[] args) {
+        // Catch creating socket on same port exception
+        // Thread brokerServer = new Thread(new Server(5000));
+        // Thread marketServer = new Thread(new Server(5001));
+        Server server = new Server(5000, 5001);
+        server.startServer();
 
-    public void runServer() {
-        try {
-            this.serverSocket = new ServerSocket(this.portNumber);
-            this.serverSocket.setSoTimeout(50000);
-            System.out.println("Starting Server Socket on port: " +  this.serverSocket.getLocalPort());
-        } catch (IOException e) {
-            System.err.println("Could not run server!");
-            System.err.println(e.getMessage());
-        }
-
-        while (true) {
-            try {
-                Socket clientSocket = serverSocket.accept();
-                // Start new thread
-                MarketRunnable mr = MarketRunnable(clientSocket); 
-                new Thread(mr).start();
-            } catch (IOException e) {
-                System.err.println(e.getMessage());
-            }
-        }
+        // brokerServer.start();
+        // marketServer.start();
     }
+    //  Create and open and selector 
+    //  Create server socket channel and set to non-blocking
+    //  Bind ssc to InetAdress
+    //  Register selector to ssc  
 }
+

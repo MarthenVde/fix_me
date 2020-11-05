@@ -45,7 +45,7 @@
                 <manifest>
                     <addClasspath>true</addClasspath>
                     <classpathPrefix>lib/</classpathPrefix>
-                    <mainClass>com.wtc.marvand.router.Main</mainClass>
+                    <mainClass>com.wtc.marvand.router.Router</mainClass>
                 </manifest>
             </archive>
           </configuration>

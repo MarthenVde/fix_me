@@ -1,16 +1,17 @@
-package com.wtc.marvand.market;
+package com.wtc.marvand.router;
 
 import java.net.Socket;
 import java.io.*;
+import java.io.BufferedReader;
 
-
-public class MarketRunnable implements Runnable {
+public class ServerRunnable implements Runnable {
     protected Socket clientSocket = null;
 
-    public MarketRunnable (Socket clientSocket) {
+    public ServerRunnable(Socket clientSocket) {
         this.clientSocket = clientSocket; 
     }
 
+    @Override
     public void run () {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(this.clientSocket.getInputStream()));
