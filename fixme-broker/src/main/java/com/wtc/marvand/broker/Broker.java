@@ -4,31 +4,103 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.util.Iterator;
+import java.util.Vector;
+import java.util.Set;
+import java.net.InetAddress;
 
 public class Broker {
-    public static void main( String[] args )
-    {
-        int portNumber = 5001;
-        String hostname = "127.0.0.1";
-        Socket clientSocket;
+    private static BufferedReader input = null;
+    
+    public static void main(String[] args) throws Exception {
+       InetSocketAddress addr = new InetSocketAddress(InetAddress.getByName("localhost"), 5000);
+       Selector selector = Selector.open();
+       SocketChannel sc = SocketChannel.open();
+       sc.configureBlocking(false);
+       sc.connect(addr);
+       sc.register(selector, SelectionKey.OP_CONNECT |
+          SelectionKey.OP_READ | SelectionKey.
+             OP_WRITE);
 
-        PrintWriter out;
-        BufferedReader in;
-        InputStreamReader ir;
+       input = new BufferedReader(new
+          InputStreamReader(System.in));
 
-        try {
-            clientSocket = new Socket(hostname, portNumber);
-            out = new PrintWriter(clientSocket.getOutputStream(), true);
-            ir = new InputStreamReader(clientSocket.getInputStream());
-            in = new BufferedReader(ir);
-            out.println("Broker says hi!!!");
-            System.out.println("Server says: " + in.readLine());
-        } catch (UnknownHostException e) {
-            System.exit(1);
-        } catch (IOException e) {
-            System.exit(1);
-        }
+       while (true) {
+          if (selector.select() > 0) {
+             Boolean doneStatus = processReadySet
+                (selector.selectedKeys());
+             if (doneStatus) {
+                break;
+             }
+          }
+       }
+       sc.close();
     }
-}
+
+    public static Boolean processReadySet(Set readySet) throws Exception {
+       SelectionKey key = null;
+       Iterator iterator = null;
+       iterator = readySet.iterator();
+
+       while (iterator.hasNext()) {
+          key = (SelectionKey) iterator.next();
+          iterator.remove();
+       }
+
+       if (key.isConnectable()) {
+          Boolean connected = processConnect(key);
+          if (!connected) {
+             return true;
+          }
+       }
+
+       if (key.isReadable()) {
+          SocketChannel sc = (SocketChannel)key.channel();
+          ByteBuffer bb = ByteBuffer.allocate(1024);
+          sc.read(bb);
+          String response = new String(bb.array()).trim();
+
+          System.out.println("Router answered with: " + response);
+        //  if new connection ---> set id
+        //  else --> Check message --> if valid --> update inventory
+       }
+
+
+        // Add simulation function
+       if (key.isWritable()) {
+          System.out.print("Type a message to router (type quit to stop): ");
+          String msg = input.readLine();
+          if (msg.equalsIgnoreCase("quit")) {
+             return true;
+          }
+          SocketChannel sc = (SocketChannel) key.channel();
+          ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
+          sc.write(bb);
+       }
+       return false;
+    }
+
+
+
+    public static Boolean processConnect(SelectionKey key) {
+       SocketChannel sc = (SocketChannel) key.channel();
+       try {
+          while (sc.isConnectionPending()) {
+             sc.finishConnect();
+          }
+       } catch (IOException e) {
+          key.cancel();
+          e.printStackTrace();
+          return false;
+       }
+       return true;
+    }
+ }
+ 

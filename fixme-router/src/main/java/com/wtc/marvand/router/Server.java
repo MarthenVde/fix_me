@@ -1,6 +1,5 @@
 package com.wtc.marvand.router;
 
-// import com.wtc.marvand.router.ServerRunnable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -10,176 +9,123 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.Vector;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import com.wtc.marvand.router.ServerRunnables;
+import java.util.List;
 
-public class Server {
+public class Server implements Runnable {
     private static int idCounter = 99999;
     private Selector selector;
-    int brokerPort = 5000;
-    int marketPort = 5001;
+    public final ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(2, 2, 0, 
+        TimeUnit.MICROSECONDS, new LinkedBlockingQueue<Runnable>());
+    private Vector<String> messages;
+    String id = "";
+    int port;
+    String componentType = "";
+    
+    public Server(int port) {
+        this.port = port;
+        this.messages = new Vector<String>();
 
-    public Server(int mPort, int bPort) {
-    }
-
-    private void initSSChannel(int port) {
-        try {
-            InetSocketAddress address = new InetSocketAddress("localhost", port);
-            ServerSocketChannel ssChannel = ServerSocketChannel.open();
-            ssChannel.configureBlocking(false);
-            ssChannel.bind(address);
-            ssChannel.register(this.selector, SelectionKey.OP_ACCEPT);
-        } catch (UnknownHostException e) {
-            System.out.println(e.getMessage());
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
+        if (port == 5000) {
+            this.componentType = "Broker";
+        } else {
+            this.componentType = "Market";
         }
     }
 
-    public void startServer() {
-        try {
-            this.selector = Selector.open();
-            initSSChannel(this.brokerPort);
-            initSSChannel(this.marketPort);
+    public String popMessage() {
+        if (messages.size() > 0) {
+            String message = messages.get(0);
+            messages.remove(0);
+            return message;
+        } else {
+            return null;
+        }
+    }
 
-            while (true) {
-                if (this.selector.select() <= 0)
-                    continue;
-                else {
-                    System.out.println("Selector has message");
+    private int generateNewId() {
+        idCounter++;
+        if (idCounter < 1000000) {
+            return idCounter;
+        } else {
+            System.out.println("Ran out of unique id's!");
+            System.exit(1);
+            return -1;
+        }
+    }
+    
+    private void acceptConnection(ServerSocketChannel ssc) throws IOException {
+        SocketChannel sc = ssc.accept();
+        sc.configureBlocking(false);
+        sc.register(selector, SelectionKey.OP_READ);
+        this.id = "" + this.generateNewId();
+        
+        System.out.println("Accepted " + this.componentType + " connection... ID [" + this.id + "]");
+    }
+        
+    private void createMessageHandler(SelectionKey key) throws IOException {
+        SocketChannel sc = (SocketChannel)key.channel();
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+        sc.read(buffer);
+        String incomingMessage = new String(buffer.array()).trim();
+
+        int incomingPort = sc.socket().getLocalPort();
+
+        if (incomingMessage.length() <= 0) {
+            System.out.println(this.componentType + " connection closed on port: " + incomingPort);
+            sc.close();
+        } else {
+            Runnable runnable = new ServerRunnables().handlerRunnable(sc, incomingMessage, id, this.messages);
+            threadPoolExecutor.execute(runnable);
+        }
+    }
+
+    public void startServer() throws Exception {
+        this.selector = Selector.open();
+        InetSocketAddress address = new InetSocketAddress("localhost", this.port);
+        ServerSocketChannel ssChannel = ServerSocketChannel.open();
+        ssChannel.configureBlocking(false);
+        ssChannel.bind(address);
+        ssChannel.register(this.selector, SelectionKey.OP_ACCEPT);
+        SelectionKey key = null;
+
+        System.out.println("Server listening on port: " + ssChannel.socket().getLocalPort());
+        while (true) {
+            if (this.selector.select() > 0) {
+                Set<SelectionKey> selectedKeys = this.selector.selectedKeys();
+                Iterator<SelectionKey> iterator = selectedKeys.iterator();
+
+                while (iterator.hasNext()) {
+                    key = (SelectionKey)iterator.next();
+                    iterator.remove();
+
+                    if (key.isAcceptable()) {
+                        this.acceptConnection(ssChannel);
+                    }
+                    if (key.isReadable()) {
+                        // create new message handler
+                        // Start new message handler
+                        createMessageHandler(key);
+                        // this.handleReadOp(key);
+                    }
                 }
             }
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
         }
     }
 
-    // public void createServerSocketChannel(int port) throws Exception {
-    //     ServerSocketChannel ssChannel = ServerSocketChannel.open();
-    //     ssChannel.configureBlocking(false);
-    //     ssChannel.bind(new InetSocketAddress(port));
-    //     ssChannel.register(this.selector, SelectionKey.OP_ACCEPT);
-    // }
-
-    // public void runServer() {
-    //     try {
-    //         this.selector = Selector.open();
-    //     } catch (Exception e) {
-    //         e.printStackTrace();
-    //     }
-        
-    // }
-
-    // private int generateNewId() {
-    //     idCounter++;
-    //     if (idCounter < 1000000) {
-    //         return idCounter;
-    //     } else {
-    //         System.out.println("Ran out of unique id's!");
-    //         System.exit(1);
-    //     }
-    // }
-
-    // private void acceptConnection(ServerSocketChannel ssc) {
-
-    // }
-
-    // private void createServer() throws Exception {
-    //     InetAddress host = InetAddress.getByName("localhost");
-    //     this.selector = Selector.open();
-    //     ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
-    //     serverSocketChannel.configureBlocking(false);
-    //     serverSocketChannel.bind(new InetSocketAddress(host, this.port));
-    //     serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-    //     SelectionKey key = null;
-    //     System.out.println("Waiting for connection on port: " + this.port);
-    //     while (true) {
-    //         if (selector.select() <= 0)
-    //             continue;
-    //         Set<SelectionKey> selectedKeys = selector.selectedKeys();
-    //         Iterator<SelectionKey> iterator = selectedKeys.iterator();
-    //         while (iterator.hasNext()) {
-    //             key = (SelectionKey) iterator.next();
-    //             iterator.remove();
-    //             if (key.isAcceptable()) {
-    //                 SocketChannel sc = serverSocketChannel.accept();
-    //                 sc.configureBlocking(false);
-    //                 sc.register(selector, SelectionKey.OP_READ);
-    //                 System.out.println("Connection Accepted: " + sc.getLocalAddress() + "\n");
-    //             }
-    //             if (key.isReadable()) {
-    //                 SocketChannel sc = (SocketChannel) key.channel();
-    //                 ByteBuffer bb = ByteBuffer.allocate(1024);
-    //                 sc.read(bb);
-    //                 String result = new String(bb.array()).trim();
-    //                 System.out.println("Message received: " + result + " Message length= " + result.length());
-    //                 if (result.length() <= 0) {
-    //                     sc.close();
-    //                     System.out.println("Connection closed...");
-    //                     System.out.println("Server will keep running. " + "Try running another client to "
-    //                             + "re-establish connection");
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     // public static void main(String[] args) throws Exception {
-
-    //     // }
-    // }
-
-    // @Override
-    // public void run() {
-    //     // TODO Auto-generated method stub
-    //     try {
-    //         this.createServer();
-    //     } catch (Exception e) {
-    //         // TODO Auto-generated catch block
-    //         e.printStackTrace();
-    //     }
-    // }
-//     public void runServer() {
-//         InetAddress hostIPAddress = InetAddress.getByName("localhost");
-//         int port = 19000;
-//         Selector selector = Selector.open();
-//         ServerSocketChannel ssChannel = ServerSocketChannel.open();
-//         ssChannel.configureBlocking(false);
-//         ssChannel.socket().bind(new InetSocketAddress(hostIPAddress, port));
-//         ssChannel.register(selector, SelectionKey.OP_ACCEPT);
-//         while (true) {
-//           if (selector.select() <= 0) {
-//             continue;
-//           }
-//           processReadySet(selector.selectedKeys());
-//         }
-//         // try {
-//             //     port = 5001;
-//         //     // server.bind(new InetSocketAddress("127.0.0.1", portNumber));
-//         //     // Future<AsynchronousServerSocketChannel> acceptFuture = server.accept();
-//         //     // AsynchronousSocketChannel worker = acceptFuture.get(10, TimeUnit.SECONDS);
-//         // } catch (IOException e) {
-//         //     System.err.println(e.getMessage());
-
-//         // }
-        
-//         // try {
-//         //     this.serverSocket = new ServerSocket(this.portNumber);
-//         //     this.serverSocket.setSoTimeout(50000);
-//         //     System.out.println("Starting Server Socket on port: " +  this.serverSocket.getLocalPort());
-//         // } catch (IOException e) {
-//         //     System.err.println("Could not run server!");
-//         //     System.err.println(e.getMessage());
-//         // }
-
-//         // while (true) {
-//         //     try {
-//         //         Socket clientSocket = serverSocket.accept();
-//         //         // Start new thread
-//         //         ServerRunnable mr = new ServerRunnable(clientSocket);
-//         //         new Thread(mr).start();
-//         //     } catch (IOException e) {
-//         //         System.err.println(e.getMessage());
-//         //     }
-//         // }
-//     }
+    @Override
+    public void run() {
+        try {
+            this.startServer();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
