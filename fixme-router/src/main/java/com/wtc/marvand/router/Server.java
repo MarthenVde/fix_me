@@ -16,6 +16,9 @@ import java.util.Vector;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
+
 import com.wtc.marvand.router.ServerRunnables;
 import java.util.List;
 
@@ -28,6 +31,7 @@ public class Server implements Runnable {
     String id = "";
     int port;
     String componentType = "";
+    SocketChannel sc = null;
     
     public Server(int port) {
         this.port = port;
@@ -38,6 +42,10 @@ public class Server implements Runnable {
         } else {
             this.componentType = "Market";
         }
+    }
+
+    public String getId() {
+        return this.id;
     }
 
     public String popMessage() {
@@ -62,29 +70,34 @@ public class Server implements Runnable {
     }
     
     private void acceptConnection(ServerSocketChannel ssc) throws IOException {
-        SocketChannel sc = ssc.accept();
-        sc.configureBlocking(false);
-        sc.register(selector, SelectionKey.OP_READ);
+        this.sc = ssc.accept();
+        this.sc.configureBlocking(false);
+        this.sc.register(selector, SelectionKey.OP_READ);
         this.id = "" + this.generateNewId();
         
         System.out.println("Accepted " + this.componentType + " connection... ID [" + this.id + "]");
     }
         
     private void createMessageHandler(SelectionKey key) throws IOException {
-        SocketChannel sc = (SocketChannel)key.channel();
         ByteBuffer buffer = ByteBuffer.allocate(1024);
-        sc.read(buffer);
-        String incomingMessage = new String(buffer.array()).trim();
 
-        int incomingPort = sc.socket().getLocalPort();
-
-        if (incomingMessage.length() <= 0) {
-            System.out.println(this.componentType + " connection closed on port: " + incomingPort);
-            sc.close();
-        } else {
-            Runnable runnable = new ServerRunnables().handlerRunnable(sc, incomingMessage, id, this.messages);
-            threadPoolExecutor.execute(runnable);
+        try {
+            this.sc.read(buffer);
+            String incomingMessage = new String(buffer.array()).trim();
+            if (incomingMessage.length() <= 0) {
+                throw new IOException();
+            } else {
+                Runnable runnable = new ServerRunnables().handlerRunnable(this.sc, incomingMessage, id, this.messages);
+                threadPoolExecutor.execute(runnable);
+            }
+        } catch (IOException e) {
+            System.out.println(this.componentType + " connection closed on port: " + this.port);
+            this.sc.close();
         }
+    }
+
+    public SocketChannel getScChannel() {
+        return this.sc;
     }
 
     public void startServer() throws Exception {
@@ -105,20 +118,32 @@ public class Server implements Runnable {
                 while (iterator.hasNext()) {
                     key = (SelectionKey)iterator.next();
                     iterator.remove();
-
                     if (key.isAcceptable()) {
                         this.acceptConnection(ssChannel);
                     }
                     if (key.isReadable()) {
-                        // create new message handler
-                        // Start new message handler
                         createMessageHandler(key);
-                        // this.handleReadOp(key);
                     }
                 }
             }
         }
     }
+            // System.out.println(" No market avalaible, please connect a market");
+      
+
+    // public static void sendMessage(String message, SocketChannel sc){
+    //     try {
+    //         if (sc.isOpen() && sc.isConnected()) {
+    //             ByteBuffer msgBuffer = ByteBuffer.allocate(message.length());
+    //             msgBuffer.wrap(message.getBytes());
+    //             sc.write(msgBuffer.wrap(message.getBytes())); 
+    //         } else {
+    //             System.out.println("Closed connection");
+    //         }
+    //     } catch (IOException e){
+    //         System.out.println(" No market avalaible, please connect a market");
+    //     }
+    // }
 
     @Override
     public void run() {

@@ -2,6 +2,9 @@ package com.wtc.marvand.router;
 
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
 import javax.sound.midi.SysexMessage;
 
@@ -10,31 +13,60 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
-
+import com.wtc.marvand.router.Server;
 public class ServerRunnables {
-    private void closeSocketConnection(SocketChannel sc) {
+    private static void closeSocketConnection(SocketChannel sc) {
         try {
             sc.close();
-            System.out.println("Closing connection ...");
+            System.out.println("Closing connection on port: " + sc.socket().getLocalPort());
             // System.out.println("Disconnected from " + " ID [" + id + "]");
         } catch (IOException e) {
             System.out.println(e.getMessage());
             System.out.println("Failed to close connection");
         }
     }
+    
+    public static long getCRC32Checksum(byte[] bytes) {
+        Checksum crc32 = new CRC32();
+        crc32.update(bytes, 0, bytes.length);
+        return crc32.getValue();
+    }
 
-    private void socketWrite(SocketChannel socket, String message) throws IOException {
-        if (socket.isOpen() && socket.isConnected()) {
-            ByteBuffer buffer = ByteBuffer.allocate(message.length());
-            buffer.wrap(message.getBytes());
-            socket.write(buffer);
-            // buffer.flip();
-            // buffer.clear();
+    public static void sendMessage(String message, SocketChannel sc) {
+        try {
+            if (sc.isOpen() && sc.isConnected()) {
+                ByteBuffer msgBuffer = ByteBuffer.allocate(message.length());
+                msgBuffer.wrap(message.getBytes());
+                sc.write(msgBuffer.wrap(message.getBytes()));
+            } else {
+                System.out.println("Closed connection");
+            }
+        } catch (IOException e) {
+            closeSocketConnection(sc);
+            // System.out.println(" No market avalaible, please connect a market");
         }
     }
 
     private boolean validMessage(String message) {
-        return true;
+        try {
+            // if (Pattern.matches("market_id=\\d+", message)) {
+            //     return true;
+            // }
+
+            String checksum  = message.split("10=")[1];
+            int startIndex = ((message.split("35=")[0]).length());
+            int endIndex = message.length() - (checksum.length() + 3);
+            String messageBody = message.substring(startIndex, endIndex);
+            String newCs = "" + (getCRC32Checksum(messageBody.getBytes()));
+
+            if (checksum.equals(newCs)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public Runnable handlerRunnable(SocketChannel sc, String incomingMessage, String id, Vector<String> messages) {
@@ -42,30 +74,14 @@ public class ServerRunnables {
             @Override
             public void run() {
                 if (sc.isConnected() && sc.isOpen()) {
-                    try {
                         if (incomingMessage.equals("newConnection")) {
-                            socketWrite(sc, "new_connection_id=" + id);
-                            // ByteBuffer buffer = ByteBuffer.allocate(1024);
-                            // buffer.wrap("hello new user".getBytes());
-                            // sc.write(buffer);
-                            // buffer.clear();
-                        } else if (validMessage(incomingMessage) == true) {
-                            System.out.println("Added message");
-                            messages.add(incomingMessage);
-                            // for (int i = 0; i < messages.size(); i++) {
-                            //     System.out.println(i + " | " + messages.get(i));
-                            // }
+                                sendMessage("new_connection_id=" + id, sc);
+                                } else if (validMessage(incomingMessage) == true) {
+                                    messages.add(incomingMessage);
                         } else {
                             System.out.println("Invalid message received on port: " + sc.socket().getLocalPort());
                         }
-                        // Check if new connection
-                        // Validate message
-                        // Add message
-                    } catch (IOException e) {
-                        System.out.println(e.getMessage());
-                        closeSocketConnection(sc);
                     }
-                }
             }
         };
         return runnable;
