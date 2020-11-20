@@ -19,9 +19,11 @@ public class Router {
         brokerThread.start();
         marketThread.start();
 
+        // Update broker inventory
+        // Cleanup
+        // Testing
+
         while (true) {
-            // String marketId = marketServer.getId();
-            // System.out.println("looking for mesasge");
             String brokerRequest = brokerServer.popMessage();
             
             if (brokerRequest != null) {
@@ -29,7 +31,6 @@ public class Router {
                     while (marketServer.getScChannel() == null) {
                         System.out.println("Waiting for market connection ...");
                         TimeUnit.SECONDS.sleep(1);
-                        // System.out.println((marketServer.getScChannel() == null));
                     }
                 }
                 String[] fixMsg = brokerRequest.split("\\|");
@@ -37,8 +38,6 @@ public class Router {
                 brokerRequest = String.join("|", fixMsg);
                 System.out.println("Broker message received ID[" + brokerServer.id + "] : " + brokerRequest);
                 ServerRunnables.sendMessage(brokerRequest, marketServer.getScChannel());
-                // Replace market id
-                // ServerRunnables.sendMessage("market_id=" + marketId, brokerServer.getScChannel());
             }
             
             

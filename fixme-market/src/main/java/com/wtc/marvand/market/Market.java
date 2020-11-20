@@ -74,13 +74,11 @@ public class Market {
                 sc.read(bb);
                 String response = new String(bb.array()).trim();
     
-            //    System.out.println("Router answered with: " + response);
                 if (Pattern.matches("new_connection_id=\\d+", response)) {
                     id = response.split("=")[1];    
                 } else {
                     processBrokerRequest(response, sc);
                 }
-                // sendBuyOrder(sc);
             } catch (IOException e) {
                 System.out.println("Connection to router closed!");
                 return true;
@@ -145,26 +143,19 @@ public class Market {
         sendMessage(message, sc);
     }
 
-    // 8=FIX.4.4|9=100|35=D|56=100001|49=100000|54=1|38=0|40=1|44=2.0|52=2020-11-19T10:16:22.275837Z|INSTRUMENT=Piano|11=0|10=242322918
+    // 8=FIX.4.4|9=101|35=D|56100000|49=100001|54=1|38=2|40=1|44=12.0|52=2020-11-20T08:29:54.006806Z|INSTRUMENT=Piano|11=1|10=3906825874
     private static void processBrokerRequest(String req, SocketChannel sc) {
         if (req.length() >= 1) {
             try {
-                // System.out.println(req);
                 String[] fixReq = req.split("\\|");
                 String brokerId = fixReq[4].split("=")[1];
                 String instrument = fixReq[10].split("=")[1];
                 float price = Float.parseFloat(fixReq[8].split("=")[1]);
                 int qty = Integer.parseInt(fixReq[6].split("=")[1]);
                 int orderType = Integer.parseInt(fixReq[5].split("=")[1]);
-                int orderId = Integer.parseInt(fixReq[5].split("=")[1]);
+                int orderId = Integer.parseInt(fixReq[11].split("=")[1]);
                 boolean buy = (orderType == 1) ? true : false;
                 boolean orderAccepted = orderInstrument(instrument, qty, price, buy);
-
-
-                // System.out.println("Instrument : " + instrument);
-                // System.out.println("qty : " + qty);
-                // System.out.println("price: " + price);
-                // System.out.println("buy: " + buy);
                 
                 if (orderAccepted) {
                     System.out.println("Order accepted!");

@@ -19,16 +19,21 @@ import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
 
+import javax.naming.InterruptedNamingException;
+import javax.sound.midi.Instrument;
+
+import java.util.HashMap;
+
 public class Broker {
     private static Scanner in = new Scanner(System.in);
     private static BufferedReader input = null;
     private static final String[] instrumentTypes = {"Violin", "Trumpet", "Piano", "Cello", "Drums", "Bass"};
     private static final int[] instrumentQty = {10, 10, 10, 10, 10, 10};
     private static String id = "";
-    private static Vector<String> orders = new Vector<String>();
+    private static HashMap<String, String> orders = new HashMap<String, String>();
     private static int orderId = 0;
-    // private static String marketId = "";
 
+    
     public static void main(String[] args) throws Exception {
         InetSocketAddress addr = new InetSocketAddress(InetAddress.getByName("localhost"), 5000);
         Selector selector = Selector.open();
@@ -57,10 +62,11 @@ public class Broker {
     }
 
     private static int nextOrderId() {
-        return orderId++;
+        orderId++;
+        return orderId;
     }
 
-    private static String generateFixMessage(int orderType, String instrument, int qty, float price) {
+    private static String generateFixMessage(int orderType, String instrument, int qty, float price, int orderID) {
         String msgType = "D";
         ZonedDateTime currentTime = ZonedDateTime.now(ZoneOffset.UTC);
 
@@ -73,12 +79,58 @@ public class Broker {
         body += "44=" + price + "|";
         body += "52=" + currentTime + "|";
         body += "INSTRUMENT=" + instrument + "|";
-        body += "11=" + nextOrderId() + "|";
+        body += "11=" + orderID + "|";
 
         int bodyLength = body.getBytes().length;
         String header = "8=FIX.4.4|9=" + bodyLength;
         String message = header + "|" + body + "10=" + getCRC32Checksum(body.getBytes());
         return message;
+    }
+
+    private static void updateInventory(String order) {
+        try {
+            String[] orderLst = order.split("#");
+            int index = Integer.parseInt(orderLst[0]);
+            int qty = Integer.parseInt(orderLst[1]);
+            int buySell = Integer.parseInt(orderLst[2]);
+
+            if (buySell == 1) {
+                instrumentQty[index] += qty;
+            } else if (buySell == 2) {
+                instrumentQty[index] -= qty;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("invalid order!");
+        }
+    }
+
+    // 8=FIX.4.4|9=66|35=8|56=100002|49=100001|39=8|52=2020-11-20T07:42:58.340150Z|11=1|10=576738955
+    private static void completeOrder(String fixOrder) {
+        try {
+            String[] fixReq = fixOrder.split("\\|");
+            String brokerId = (fixReq[3].split("=")[1]).trim();
+            int orderStatus = Integer.parseInt(fixReq[5].split("=")[1]);
+            String orderID = (fixReq[7].split("=")[1]).trim();
+
+            if (brokerId.equalsIgnoreCase(id)) {
+                String order = orders.get(orderID);
+                if (order != null) {
+                    orders.remove(orderID);
+                    if (orderStatus == 2) {
+                        updateInventory(order);
+                        System.out.println("Completed order [" + orderID + "]");
+                    } else {
+                        System.out.println("Canceled order [" + orderID + "]");
+                    }
+                } else {
+                    System.out.println("Order not found!");
+                }
+            } else {
+                System.out.println("Broker id did not match!");
+            }
+        } catch (Exception e) {
+            System.out.println("Invalid response from market");
+        }
     }
 
     public static Boolean processReadySet(Set readySet) throws Exception {
@@ -109,7 +161,8 @@ public class Broker {
                     id = response.split("=")[1];
                     System.out.println("Connected to router with id: " + id);
                 } else {
-                    System.out.println("Market sent message: " + response);
+                    // System.out.println("");
+                    completeOrder(response);
                 }
                 sendBuyOrder(sc);
             } catch (IOException e) {
@@ -128,7 +181,6 @@ public class Broker {
     }
 
     public static void sendBuyOrder(SocketChannel sc) {
-            boolean buy = false;
             int selIndex = 0;
             int qty = 0;
             float price = 0;
@@ -166,7 +218,7 @@ public class Broker {
             while (true) {
                 int maxQty = 100;
 
-                if (buy == false) {
+                if (buySell == 2) {
                     maxQty = instrumentQty[selIndex];
                 }
 
@@ -198,17 +250,17 @@ public class Broker {
                     System.out.println("Invalid input");
                 }
             }
-            String fixMsg = generateFixMessage(buySell, instrumentTypes[selIndex], qty, price);
+            int orderID = nextOrderId();
+            String fixMsg = generateFixMessage(buySell, instrumentTypes[selIndex], qty, price, orderID);
             sendMessage(fixMsg, sc);
-            orders.add(fixMsg);
-            System.out.println("Order sent...");
+            orders.put("" + orderID, "" + selIndex + "#" + qty + "#" + buySell);
+            System.out.println("Sent order [" + orderID + "]");
     }
 
     private static void closeSocketConnection(SocketChannel sc) {
         try {
             sc.close();
             System.out.println("Closing connection on port: " + sc.socket().getLocalPort());
-            // System.out.println("Disconnected from " + " ID [" + id + "]");
         } catch (IOException e) {
             System.out.println(e.getMessage());
             System.out.println("Failed to close connection");
@@ -226,7 +278,6 @@ public class Broker {
             }
         } catch (IOException e) {
             closeSocketConnection(sc);
-            // System.out.println(" No market avalaible, please connect a market");
         }
     }
 

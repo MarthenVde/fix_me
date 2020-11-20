@@ -128,22 +128,6 @@ public class Server implements Runnable {
             }
         }
     }
-            // System.out.println(" No market avalaible, please connect a market");
-      
-
-    // public static void sendMessage(String message, SocketChannel sc){
-    //     try {
-    //         if (sc.isOpen() && sc.isConnected()) {
-    //             ByteBuffer msgBuffer = ByteBuffer.allocate(message.length());
-    //             msgBuffer.wrap(message.getBytes());
-    //             sc.write(msgBuffer.wrap(message.getBytes())); 
-    //         } else {
-    //             System.out.println("Closed connection");
-    //         }
-    //     } catch (IOException e){
-    //         System.out.println(" No market avalaible, please connect a market");
-    //     }
-    // }
 
     @Override
     public void run() {
