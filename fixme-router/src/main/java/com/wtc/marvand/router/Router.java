@@ -1,12 +1,4 @@
 package com.wtc.marvand.router;
-
-import java.net.*;
-import java.io.*;
-import java.net.*;
-import java.nio.ByteBuffer;
-import java.nio.channels.*;
-import java.rmi.server.ServerNotActiveException;
-import java.util.*;
 import java.util.concurrent.TimeUnit;
 public class Router {
     public static void main(String[] args) throws InterruptedException {
@@ -18,10 +10,6 @@ public class Router {
 
         brokerThread.start();
         marketThread.start();
-
-        // Update broker inventory
-        // Cleanup
-        // Testing
 
         while (true) {
             String brokerRequest = brokerServer.popMessage();

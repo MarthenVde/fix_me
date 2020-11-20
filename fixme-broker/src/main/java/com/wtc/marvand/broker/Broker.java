@@ -1,8 +1,5 @@
 package com.wtc.marvand.broker;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -12,21 +9,16 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.Vector;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
-
-import javax.naming.InterruptedNamingException;
-import javax.sound.midi.Instrument;
-
 import java.util.HashMap;
 
 public class Broker {
     private static Scanner in = new Scanner(System.in);
-    private static BufferedReader input = null;
     private static final String[] instrumentTypes = {"Violin", "Trumpet", "Piano", "Cello", "Drums", "Bass"};
     private static final int[] instrumentQty = {10, 10, 10, 10, 10, 10};
     private static String id = "";
@@ -41,8 +33,6 @@ public class Broker {
         sc.configureBlocking(false);
         sc.connect(addr);
         sc.register(selector, SelectionKey.OP_CONNECT | SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-
-        input = new BufferedReader(new InputStreamReader(System.in));
 
         while (true) {
             if (selector.select() > 0) {
@@ -104,7 +94,6 @@ public class Broker {
         }
     }
 
-    // 8=FIX.4.4|9=66|35=8|56=100002|49=100001|39=8|52=2020-11-20T07:42:58.340150Z|11=1|10=576738955
     private static void completeOrder(String fixOrder) {
         try {
             String[] fixReq = fixOrder.split("\\|");
@@ -270,9 +259,8 @@ public class Broker {
     public static void sendMessage(String message, SocketChannel sc) {
         try {
             if (sc.isOpen() && sc.isConnected()) {
-                ByteBuffer msgBuffer = ByteBuffer.allocate(message.length());
-                msgBuffer.wrap(message.getBytes());
-                sc.write(msgBuffer.wrap(message.getBytes()));
+                ByteBuffer.wrap(message.getBytes());
+                sc.write(ByteBuffer.wrap(message.getBytes()));
             } else {
                 System.out.println("Closed connection");
             }

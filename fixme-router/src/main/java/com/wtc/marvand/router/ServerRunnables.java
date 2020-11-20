@@ -1,19 +1,11 @@
 package com.wtc.marvand.router;
 
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
-
-import javax.sound.midi.SysexMessage;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Vector;
-import com.wtc.marvand.router.Server;
 public class ServerRunnables {
     private static void closeSocketConnection(SocketChannel sc) {
         try {
@@ -35,9 +27,9 @@ public class ServerRunnables {
     public static void sendMessage(String message, SocketChannel sc) {
         try {
             if (sc.isOpen() && sc.isConnected()) {
-                ByteBuffer msgBuffer = ByteBuffer.allocate(message.length());
-                msgBuffer.wrap(message.getBytes());
-                sc.write(msgBuffer.wrap(message.getBytes()));
+                // ByteBuffer msgBuffer = ByteBuffer.allocate(message.length());
+                ByteBuffer.wrap(message.getBytes());
+                sc.write(ByteBuffer.wrap(message.getBytes()));
             } else {
                 System.out.println("Closed connection");
             }
